@@ -250,7 +250,7 @@
         if (pendingFile != null)
         {
             var fileName = $"{Guid.NewGuid()}_{pendingFile.Name}";
-            var folderPath = Path.Combine("wwwroot", "images");
+            var folderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "images");
             Directory.CreateDirectory(folderPath); 
             var filePath = Path.Combine(folderPath, fileName);
             
