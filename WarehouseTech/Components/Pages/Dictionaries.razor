@@ -1,0 +1,168 @@
+﻿@page "/dictionaries"
+@using WarehouseTech.Models
+@inject WarehouseTech.Services.DictionaryService DictService
+@inject IJSRuntime JS
+
+<h1>Справочники</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Типы техники</h3>
+        <button class="btn btn-primary mb-2" @onclick="() => OpenTypeForm(null)">Добавить</button>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Название</th><th>Описание</th><th>Создано</th><th>Обновлено</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var t in types)
+                {
+                    <tr>
+                        <td>@t.Name</td>
+                        <td>@t.Description</td>
+                        <td>@t.CreatedAt.ToLocalTime().ToString("g")</td>
+                        <td>@t.UpdatedAt.ToLocalTime().ToString("g")</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" @onclick="() => OpenTypeForm(t)">✎</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteType(t.Id)">🗑</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Производители</h3>
+        <button class="btn btn-primary mb-2" @onclick="() => OpenManForm(null)">Добавить</button>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Название</th><th>Описание</th><th>Создано</th><th>Обновлено</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var m in manufacturers)
+                {
+                    <tr>
+                        <td>@m.Name</td>
+                        <td>@m.Description</td>
+                        <td>@m.CreatedAt.ToLocalTime().ToString("g")</td>
+                        <td>@m.UpdatedAt.ToLocalTime().ToString("g")</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" @onclick="() => OpenManForm(m)">✎</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteMan(m.Id)">🗑</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (showTypeForm)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingType.Id == 0 ? "Добавить тип" : "Редактировать тип")</h5>
+                    <button class="btn-close" @onclick="() => showTypeForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label>Название</label>
+                        <input class="form-control" @bind="editingType.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Описание</label>
+                        <textarea class="form-control" @bind="editingType.Description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showTypeForm = false">Отмена</button>
+                    <button class="btn btn-primary" @onclick="SaveType">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showManForm)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingMan.Id == 0 ? "Добавить производителя" : "Редактировать производителя")</h5>
+                    <button class="btn-close" @onclick="() => showManForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label>Название</label>
+                        <input class="form-control" @bind="editingMan.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Описание</label>
+                        <textarea class="form-control" @bind="editingMan.Description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showManForm = false">Отмена</button>
+                    <button class="btn btn-primary" @onclick="SaveMan">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EquipmentType> types = new();
+    private List<Manufacturer> manufacturers = new();
+    private EquipmentType editingType = new();
+    private Manufacturer editingMan = new();
+    private bool showTypeForm, showManForm;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        types = await DictService.GetTypesAsync();
+        manufacturers = await DictService.GetManufacturersAsync();
+    }
+
+    private void OpenTypeForm(EquipmentType? t)
+    {
+        editingType = t == null ? new() : new() { Id = t.Id, Name = t.Name, Description = t.Description, CreatedAt = t.CreatedAt };
+        showTypeForm = true;
+    }
+
+    private async Task SaveType()
+    {
+        if (editingType.Id == 0) await DictService.AddTypeAsync(editingType);
+        else await DictService.UpdateTypeAsync(editingType);
+        showTypeForm = false;
+        await ReloadAsync();
+    }
+
+    private async Task DeleteType(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "Удалить?")) { await DictService.DeleteTypeAsync(id); await ReloadAsync(); }
+    }
+
+    private void OpenManForm(Manufacturer? m)
+    {
+        editingMan = m == null ? new() : new() { Id = m.Id, Name = m.Name, Description = m.Description, CreatedAt = m.CreatedAt };
+        showManForm = true;
+    }
+
+    private async Task SaveMan()
+    {
+        if (editingMan.Id == 0) await DictService.AddManufacturerAsync(editingMan);
+        else await DictService.UpdateManufacturerAsync(editingMan);
+        showManForm = false;
+        await ReloadAsync();
+    }
+
+    private async Task DeleteMan(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "Удалить?")) { await DictService.DeleteManufacturerAsync(id); await ReloadAsync(); }
+    }
+}

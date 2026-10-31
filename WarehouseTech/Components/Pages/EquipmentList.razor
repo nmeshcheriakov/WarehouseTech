@@ -1,0 +1,295 @@
+﻿@page "/equipment"
+@page "/"
+@using WarehouseTech.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject WarehouseTech.Services.EquipmentService EqService
+@inject WarehouseTech.Services.DictionaryService DictService
+@inject IJSRuntime JS
+
+<h1>Список позиций</h1>
+
+<div class="row mb-3 g-2">
+    <div class="col">
+        <label>Поиск (тип / производитель / модель)</label>
+        <input class="form-control" placeholder="Введите текст..." @bind="search" @bind:event="oninput" />
+    </div>
+    <div class="col">
+        <label>Тип техники</label>
+        <select class="form-select" @bind="filterTypeId">
+            <option value="0">Все</option>
+            @foreach (var t in FilteredTypeOptions)
+            {
+                <option value="@t.Id">@t.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col">
+        <label>Производитель</label>
+        <select class="form-select" @bind="filterManufacturerId">
+            <option value="0">Все</option>
+            @foreach (var m in FilteredManufacturerOptions)
+            {
+                <option value="@m.Id">@m.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col">
+        <label>Цена от</label>
+        <input type="number" class="form-control" @bind="minPrice" />
+    </div>
+    <div class="col">
+        <label>Цена до</label>
+        <input type="number" class="form-control" @bind="maxPrice" />
+    </div>
+    <div class="col-auto d-flex align-items-end">
+        <button class="btn btn-success" @onclick="() => OpenForm(null)">+ Добавить</button>
+    </div>
+</div>
+
+
+<table class="table table-bordered align-middle">
+    <thead class="table-light">
+        <tr>
+            <th>Фото</th>
+            <th>Тип техники</th>
+            <th>Производитель</th>
+            <th>Модель</th>
+            <th>Страна поставки</th>
+            <th>Цена</th>
+            <th>Дата создания</th>
+            <th>Дата обновления</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (!FilteredItems.Any())
+        {
+            <tr><td colspan="9" class="text-center">Ничего не найдено</td></tr>
+        }
+        @foreach (var e in FilteredItems)
+        {
+            <tr>
+                <td>
+                    @if (!string.IsNullOrEmpty(e.PhotoPath))
+                    {
+                        <img src="@e.PhotoPath" style="height:50px; border-radius:4px;" />
+                    }
+                    else
+                    {
+                        <span class="text-muted">Нет фото</span>
+                    }
+                </td>
+                <td>@e.EquipmentType?.Name</td>
+                <td>@e.Manufacturer?.Name</td>
+                <td>@e.Model</td>
+                <td>@e.Country?.Name</td>
+                <td>@e.Price.ToString("C")</td>
+                <td>@e.CreatedAt.ToLocalTime().ToString("g")</td>
+                <td>@e.UpdatedAt.ToLocalTime().ToString("g")</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" @onclick="() => OpenForm(e)">✎</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => Delete(e.Id)">🗑</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+@if (showForm)
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editing.Id == 0 ? "Новая позиция" : "Редактировать позицию")</h5>
+                    <button type="button" class="btn-close" @onclick="() => showForm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Тип техники</label>
+                            <select class="form-select" @bind="editing.EquipmentTypeId">
+                                <option value="0">-- Выберите --</option>
+                                @foreach (var t in types) { <option value="@t.Id">@t.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Производитель</label>
+                            <select class="form-select" @bind="editing.ManufacturerId">
+                                <option value="0">-- Выберите --</option>
+                                @foreach (var m in manufacturers) { <option value="@m.Id">@m.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Модель</label>
+                            <input class="form-control" @bind="editing.Model" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Цена</label>
+                            <input type="number" step="0.01" class="form-control" @bind="editing.Price" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Страна поставки</label>
+                            <div class="input-group">
+                                <select class="form-select" @bind="editing.CountryId">
+                                    <option value="0">-- Выберите --</option>
+                                    @foreach (var c in countries) { <option value="@c.Id">@c.Name</option> }
+                                </select>
+                                <button class="btn btn-outline-primary" @onclick="AddNewCountry" title="Добавить новую страну">+ Новая страна</button>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Фотография</label>
+                            <InputFile OnChange="OnFileSelected" class="form-control" />
+                            @if (!string.IsNullOrEmpty(editing.PhotoPath))
+                            {
+                                <div class="mt-2">
+                                    <img src="@editing.PhotoPath" style="height:100px; border-radius:4px;" />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showForm = false">Отмена</button>
+                    <button class="btn btn-primary" @onclick="Save">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Equipment> items = new();
+    private List<EquipmentType> types = new();
+    private List<Manufacturer> manufacturers = new();
+    private List<Country> countries = new();
+
+    private string search = "";
+    private int filterTypeId;
+    private int filterManufacturerId;
+    private decimal? minPrice;
+    private decimal? maxPrice;
+
+    private Equipment editing = new();
+    private bool showForm;
+
+    private IBrowserFile? pendingFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        items = await EqService.GetAllAsync();
+        types = await DictService.GetTypesAsync();
+        manufacturers = await DictService.GetManufacturersAsync();
+        countries = await DictService.GetCountriesAsync();
+    }
+
+    // Логика поиска и фильтрации 
+    private IEnumerable<Equipment> FilteredItems => items.Where(e =>
+        (string.IsNullOrWhiteSpace(search)
+            || e.Model.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (e.EquipmentType?.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (e.Manufacturer?.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        && (filterTypeId == 0 || e.EquipmentTypeId == filterTypeId)
+        && (filterManufacturerId == 0 || e.ManufacturerId == filterManufacturerId)
+        && (!minPrice.HasValue || e.Price >= minPrice)
+        && (!maxPrice.HasValue || e.Price <= maxPrice));
+
+    //  Сужающиеся списки 
+    private IEnumerable<EquipmentType> FilteredTypeOptions
+    {
+        get
+        {
+            var source = filterManufacturerId == 0
+                ? items
+                : items.Where(i => i.ManufacturerId == filterManufacturerId);
+            var usedIds = source.Select(i => i.EquipmentTypeId).Distinct().ToHashSet();
+            return types.Where(t => usedIds.Contains(t.Id) || filterTypeId == t.Id);
+        }
+    }
+
+    private IEnumerable<Manufacturer> FilteredManufacturerOptions
+    {
+        get
+        {
+            var source = filterTypeId == 0
+                ? items
+                : items.Where(i => i.EquipmentTypeId == filterTypeId);
+            var usedIds = source.Select(i => i.ManufacturerId).Distinct().ToHashSet();
+            return manufacturers.Where(m => usedIds.Contains(m.Id) || filterManufacturerId == m.Id);
+        }
+    }
+
+    
+    private void OpenForm(Equipment? e)
+    {
+        editing = e == null ? new() : new Equipment
+        {
+            Id = e.Id, 
+            Model = e.Model, 
+            Price = e.Price,
+            EquipmentTypeId = e.EquipmentTypeId, 
+            ManufacturerId = e.ManufacturerId,
+            CountryId = e.CountryId, 
+            PhotoPath = e.PhotoPath,
+            CreatedAt = e.CreatedAt
+        };
+        pendingFile = null;
+        showForm = true;
+    }
+
+    private async Task Save()
+    {
+        // Загрузка фото 
+        if (pendingFile != null)
+        {
+            var fileName = $"{Guid.NewGuid()}_{pendingFile.Name}";
+            var folderPath = Path.Combine("wwwroot", "images");
+            Directory.CreateDirectory(folderPath); 
+            var filePath = Path.Combine(folderPath, fileName);
+            
+            await using var fs = File.Create(filePath);
+            await pendingFile.OpenReadStream(5 * 1024 * 1024).CopyToAsync(fs);
+            
+            editing.PhotoPath = $"images/{fileName}";
+        }
+
+        if (editing.Id == 0) await EqService.AddAsync(editing);
+        else await EqService.UpdateAsync(editing);
+
+        showForm = false;
+        await ReloadAsync();
+    }
+
+    private async Task Delete(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить эту позицию?"))
+        {
+            await EqService.DeleteAsync(id);
+            await ReloadAsync();
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        pendingFile = e.File;
+    }
+
+    
+    private async Task AddNewCountry()
+    {
+        var name = await JS.InvokeAsync<string?>("prompt", "Введите название новой страны:");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var c = await DictService.GetOrCreateCountryAsync(name);
+        
+        countries = await DictService.GetCountriesAsync();
+        editing.CountryId = c.Id;
+    }
+}
